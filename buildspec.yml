@@ -47,4 +47,4 @@ phases:
           --paths "/*" \
           --query 'Invalidation.Id' \
           --output text)
-      - echo "Invalidation created: ${INVALIDATION_ID}"
+        echo "Invalidation created: ${INVALIDATION_ID}"

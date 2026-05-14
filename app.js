@@ -102,6 +102,7 @@ function setWorkspace(idx, animate = true) {
   if (!animate) requestAnimationFrame(() => workspacesEl.style.removeProperty('transition'));
   updateWorkspacePips();
   if (typeof updateBannerVisibility === 'function') updateBannerVisibility();
+  if (typeof restartCycle === 'function') restartCycle();
 }
 
 function updateWorkspacePips() {
@@ -195,6 +196,13 @@ function clearWorkspaceDrag(snap = false) {
 function onPointerDown(e) {
   // ignore secondary pointers
   if (state.gesture) return;
+
+  // Editable content (the FAB-demo textedit) needs the browser's native
+  // text-selection drag — bail before we steal the pointer.
+  if (e.target.closest('[contenteditable="true"]')) return;
+
+  // FAB UI handles its own pointer events; keep the gesture system out.
+  if (e.target.closest('#tsFab, #tsFabBar, #tsOsk')) return;
 
   // dismissible elements (banner, shade-entry, closable window) bypass the popover-skip rule
   const closable    = e.target.closest('[data-closable]');
@@ -532,6 +540,13 @@ function hideHint() { hint.classList.remove('show'); }
 function cycleShow() {
   cycleTimer = null;
   if (state.gesture) return;
+  // Suppress hints while the maximised TextEdit workspace is in view — the FAB /
+  // fullscreen-apps / panel-auto-hide demos need an uncluttered canvas.
+  if (currentWs === 2) {
+    hideHint();
+    cycleTimer = setTimeout(cycleShow, HINT_GAP_MS);
+    return;
+  }
   const set = HINT_SETS[state.mode] || [];
   if (set.length === 0) {
     // nothing for this mode; do not show, but re-poll in case mode changes shortly
@@ -773,6 +788,7 @@ function applySimState() {
   } else {
     removeFullscreenWorkspace();
   }
+  applyFabState();
 }
 
 function syncToggleUI(name, on) {
@@ -789,12 +805,17 @@ function setToggle(name, on) {
   if (!key) return;
   // panel-hide can only be toggled when fullscreen-apps is on
   if (name === 'panel-hide' && on && !simState.fullscreenApps) return;
+  // Turning fab on cascades fullscreen-apps on (shares the TextEdit workspace)
+  if (name === 'fab' && on && !simState.fullscreenApps) {
+    simState.fullscreenApps = true;
+    syncToggleUI('fullscreen-apps', true);
+  }
   simState[key] = on;
   syncToggleUI(name, on);
-  // Turning fullscreen-apps off implicitly turns off panel-hide
-  if (name === 'fullscreen-apps' && !on && simState.panelHide) {
-    simState.panelHide = false;
-    syncToggleUI('panel-hide', false);
+  // Turning fullscreen-apps off implicitly turns off panel-hide and fab
+  if (name === 'fullscreen-apps' && !on) {
+    if (simState.panelHide) { simState.panelHide = false; syncToggleUI('panel-hide', false); }
+    if (simState.fab) { simState.fab = false; syncToggleUI('fab', false); }
   }
   syncTogglesEnabled();
   applySimState();
@@ -904,6 +925,319 @@ document.querySelectorAll('.qs-tile').forEach((btn) => {
 });
 
 syncTogglesEnabled();
+
+// ---------- Touch text-action FAB ----------
+const tsFab = document.getElementById('tsFab');
+const tsFabBar = document.getElementById('tsFabBar');
+const tsOsk = document.getElementById('tsOsk');
+
+const FAB_SIZE = 36;
+const FAB_EDGE = 14;
+const FAB_BAR_GAP = 8;
+const FAB_BAR_EDGE = 8;
+const DRAG_THRESHOLD = 5;
+
+// In-demo clipboard — the textedit is the only thing the FAB acts on, so we
+// don't need the real system clipboard (which has permission / cross-browser
+// quirks anyway).
+let internalClipboard = '';
+let fabPos = null; // {x, y} in shell-local px; null until first apply
+
+// Track the last selection inside the editable textedit, so we can restore
+// it before running an action even if focus/selection collapsed in between.
+let savedEditRange = null;
+document.addEventListener('selectionchange', () => {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  const ed = getEditableTextedit();
+  if (!ed) return;
+  const range = sel.getRangeAt(0);
+  if (ed.contains(range.commonAncestorContainer) || ed === range.commonAncestorContainer) {
+    savedEditRange = range.cloneRange();
+  }
+});
+
+function getEditableTextedit() {
+  return document.querySelector('#wsFullscreen .fullscreen-textedit');
+}
+
+function shellSize() {
+  const r = shell.getBoundingClientRect();
+  return { w: r.width, h: r.height };
+}
+
+function defaultFabPos() {
+  const { w, h } = shellSize();
+  return { x: w - FAB_SIZE - FAB_EDGE, y: h - FAB_SIZE - FAB_EDGE };
+}
+
+function clampFabPos(p) {
+  const { w, h } = shellSize();
+  return {
+    x: Math.max(FAB_EDGE, Math.min(w - FAB_SIZE - FAB_EDGE, p.x)),
+    y: Math.max(FAB_EDGE, Math.min(h - FAB_SIZE - FAB_EDGE, p.y)),
+  };
+}
+
+function applyFabPos() {
+  if (!tsFab) return;
+  fabPos = clampFabPos(fabPos || defaultFabPos());
+  tsFab.style.left = `${fabPos.x}px`;
+  tsFab.style.top = `${fabPos.y}px`;
+  tsFab.style.right = 'auto';
+  tsFab.style.bottom = 'auto';
+}
+
+// Place the action bar relative to the FAB: above by default, fall back to
+// below, then to the side, clamped to the shell. Mirrors the extension's
+// edge-aware logic so a dragged FAB near any edge still shows a sane menu.
+function positionFabBar() {
+  if (!tsFabBar || !fabPos) return;
+  // Measure bar size off-screen-ish (visible:hidden keeps layout).
+  const prev = { display: tsFabBar.style.display, visibility: tsFabBar.style.visibility };
+  tsFabBar.style.visibility = 'hidden';
+  tsFabBar.style.display = 'inline-flex';
+  const bw = tsFabBar.offsetWidth;
+  const bh = tsFabBar.offsetHeight;
+  tsFabBar.style.display = prev.display;
+  tsFabBar.style.visibility = prev.visibility;
+
+  const { w, h } = shellSize();
+  const cx = fabPos.x + FAB_SIZE / 2;
+  const cy = fabPos.y + FAB_SIZE / 2;
+
+  // Default: above, horizontally centred on the FAB.
+  let bx = Math.round(cx - bw / 2);
+  let by = fabPos.y - bh - FAB_BAR_GAP;
+
+  if (by < FAB_BAR_EDGE) {
+    const belowY = fabPos.y + FAB_SIZE + FAB_BAR_GAP;
+    if (belowY + bh <= h - FAB_BAR_EDGE) {
+      by = belowY;
+    } else {
+      // Vertically constrained — flank the FAB.
+      by = Math.round(cy - bh / 2);
+      const leftX = fabPos.x - bw - FAB_BAR_GAP;
+      bx = leftX >= FAB_BAR_EDGE ? leftX : fabPos.x + FAB_SIZE + FAB_BAR_GAP;
+    }
+  }
+  bx = Math.max(FAB_BAR_EDGE, Math.min(w - bw - FAB_BAR_EDGE, bx));
+  by = Math.max(FAB_BAR_EDGE, Math.min(h - bh - FAB_BAR_EDGE, by));
+
+  tsFabBar.style.left = `${bx}px`;
+  tsFabBar.style.top = `${by}px`;
+  tsFabBar.style.right = 'auto';
+  tsFabBar.style.bottom = 'auto';
+}
+
+function applyFabState() {
+  const on = simState.fab && simState.fullscreenApps;
+  shell.classList.toggle('fab-visible', on);
+  const ed = getEditableTextedit();
+  if (ed) {
+    if (on) ed.setAttribute('contenteditable', 'true');
+    else ed.removeAttribute('contenteditable');
+  }
+  if (on) {
+    if (typeof setWorkspace === 'function' && currentWs !== 2) setWorkspace(2);
+    if (tsFab) tsFab.setAttribute('aria-hidden', 'false');
+    applyFabPos();
+  } else {
+    closeFabBar();
+    closeOsk();
+    if (tsFab) tsFab.setAttribute('aria-hidden', 'true');
+  }
+}
+
+function openFabBar() {
+  if (!tsFabBar) return;
+  positionFabBar();
+  shell.classList.add('fab-bar-open');
+  tsFabBar.setAttribute('aria-hidden', 'false');
+}
+function closeFabBar() {
+  if (!tsFabBar) return;
+  shell.classList.remove('fab-bar-open');
+  tsFabBar.setAttribute('aria-hidden', 'true');
+}
+function openOsk() {
+  if (!tsOsk) return;
+  shell.classList.add('osk-open');
+  tsOsk.setAttribute('aria-hidden', 'false');
+}
+function closeOsk() {
+  if (!tsOsk) return;
+  shell.classList.remove('osk-open');
+  tsOsk.setAttribute('aria-hidden', 'true');
+}
+
+// FAB drag + tap. Pointer events; a tap (no movement past threshold) opens
+// the bar, a drag past threshold relocates the FAB and suppresses the click
+// that the browser fires on pointerup.
+let fabDrag = null;
+let fabSuppressClick = false;
+
+if (tsFab) {
+  tsFab.addEventListener('mousedown', (e) => e.preventDefault());
+  tsFab.addEventListener('pointerdown', (e) => {
+    if (!shell.classList.contains('fab-visible')) return;
+    e.stopPropagation();
+    const r = shell.getBoundingClientRect();
+    fabDrag = {
+      pointerId: e.pointerId,
+      startSx: e.clientX, startSy: e.clientY,
+      origX: fabPos.x, origY: fabPos.y,
+      shellLeft: r.left, shellTop: r.top,
+      moved: false,
+    };
+    tsFab.setPointerCapture(e.pointerId);
+  });
+  tsFab.addEventListener('pointermove', (e) => {
+    if (!fabDrag || e.pointerId !== fabDrag.pointerId) return;
+    const dx = e.clientX - fabDrag.startSx;
+    const dy = e.clientY - fabDrag.startSy;
+    if (!fabDrag.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+    if (!fabDrag.moved) {
+      fabDrag.moved = true;
+      // Starting a drag dismisses an open bar.
+      closeFabBar();
+    }
+    fabPos = clampFabPos({ x: fabDrag.origX + dx, y: fabDrag.origY + dy });
+    applyFabPos();
+  });
+  const endFabDrag = (e) => {
+    if (!fabDrag || e.pointerId !== fabDrag.pointerId) return;
+    if (fabDrag.moved) fabSuppressClick = true;
+    try { tsFab.releasePointerCapture(fabDrag.pointerId); } catch {}
+    fabDrag = null;
+  };
+  tsFab.addEventListener('pointerup', endFabDrag);
+  tsFab.addEventListener('pointercancel', endFabDrag);
+  tsFab.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (fabSuppressClick) { fabSuppressClick = false; return; }
+    if (shell.classList.contains('fab-bar-open')) closeFabBar();
+    else openFabBar();
+  });
+}
+
+function showFabToast(label) {
+  let t = document.getElementById('tsFabToast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'tsFabToast';
+    t.className = 'ts-fab-toast';
+    shell.appendChild(t);
+  }
+  t.textContent = label;
+  t.classList.remove('show');
+  // force reflow so the next class change triggers transition
+  // eslint-disable-next-line no-unused-expressions
+  void t.offsetWidth;
+  t.classList.add('show');
+  clearTimeout(showFabToast._timer);
+  showFabToast._timer = setTimeout(() => t.classList.remove('show'), 1200);
+}
+
+function runFabAction(action) {
+  const ed = getEditableTextedit();
+  if (!ed) return;
+  ed.focus();
+  const sel = window.getSelection();
+  // Restore the last known selection inside the editable. If the user clicked
+  // the FAB and the selection collapsed (browser quirk), this brings it back.
+  if (savedEditRange && (ed.contains(savedEditRange.commonAncestorContainer) || ed === savedEditRange.commonAncestorContainer)) {
+    sel.removeAllRanges();
+    sel.addRange(savedEditRange);
+  }
+  switch (action) {
+    case 'selectAll': {
+      const range = document.createRange();
+      range.selectNodeContents(ed);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      showFabToast('Selected all');
+      break;
+    }
+    case 'copy': {
+      const text = sel.toString();
+      if (text) {
+        internalClipboard = text;
+        showFabToast('Copied');
+      } else {
+        showFabToast('Nothing selected');
+      }
+      break;
+    }
+    case 'cut': {
+      const text = sel.toString();
+      if (text) {
+        internalClipboard = text;
+        sel.deleteFromDocument();
+        showFabToast('Cut');
+      } else {
+        showFabToast('Nothing selected');
+      }
+      break;
+    }
+    case 'paste': {
+      if (!internalClipboard) { showFabToast('Clipboard empty'); break; }
+      if (!sel.rangeCount) {
+        ed.appendChild(document.createTextNode(internalClipboard));
+        showFabToast('Pasted');
+        break;
+      }
+      if (!sel.isCollapsed) sel.deleteFromDocument();
+      const range = sel.getRangeAt(0);
+      const node = document.createTextNode(internalClipboard);
+      range.insertNode(node);
+      range.setStartAfter(node);
+      range.setEndAfter(node);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      showFabToast('Pasted');
+      break;
+    }
+    case 'keyboard': {
+      closeFabBar();
+      openOsk();
+      return;
+    }
+  }
+  closeFabBar();
+}
+
+if (tsFabBar) {
+  tsFabBar.addEventListener('mousedown', (e) => e.preventDefault());
+  tsFabBar.querySelectorAll('.ts-fab-btn').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      runFabAction(btn.dataset.action);
+    });
+  });
+}
+
+if (tsOsk) {
+  tsOsk.addEventListener('mousedown', (e) => e.preventDefault());
+  tsOsk.addEventListener('pointerdown', (e) => e.stopPropagation());
+  tsOsk.querySelector('.ts-osk-hide')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeOsk();
+  });
+}
+
+shell.addEventListener('pointerdown', (e) => {
+  if (!shell.classList.contains('fab-bar-open')) return;
+  if (e.target.closest('#tsFab, #tsFabBar')) return;
+  closeFabBar();
+});
+
+// Keep the FAB inside the shell on resize.
+window.addEventListener('resize', () => {
+  if (!shell.classList.contains('fab-visible')) return;
+  applyFabPos();
+  if (shell.classList.contains('fab-bar-open')) positionFabBar();
+});
 
 // ---------- device fullscreen button ----------
 // We fullscreen the .stage (not just .device) so the control bar comes along.

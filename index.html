@@ -4,13 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Touchshell — GNOME, made for your fingers</title>
-  <meta name="description" content="A GNOME Shell extension that retrofits iPadOS-style gestures, auto-hiding chrome, and a touch text-action bar onto your Linux desktop." />
+  <meta name="description" content="A GNOME Shell extension that makes GNOME a joy to use on tablets and touchscreens — gestures, fullscreen mode, typing tweaks and more." />
   <link rel="icon" href="assets/touchshell.svg" type="image/svg+xml" />
 
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Touchshell" />
-  <meta property="og:title" content="Touchshell — GNOME, made for your fingers" />
+  <meta property="og:title" content="Touchshell - Making GNOME better on tablets and touchscreens" />
   <meta property="og:description" content="A GNOME Shell extension that makes GNOME a joy to use on tablets and touchscreens — gestures, fullscreen mode, typing tweaks and more." />
   <meta property="og:url" content="https://touchshell.com/" />
   <meta property="og:image" content="https://touchshell.com/assets/social-card.png" />
@@ -20,7 +20,7 @@
 
   <!-- Twitter / X -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Touchshell — GNOME, made for your fingers" />
+  <meta name="twitter:title" content="Touchshell - Making GNOME better on tablets and touchscreens" />
   <meta name="twitter:description" content="A GNOME Shell extension that makes GNOME a joy to use on tablets and touchscreens — gestures, fullscreen mode, typing tweaks and more." />
   <meta name="twitter:image" content="https://touchshell.com/assets/social-card.png" />
   <meta name="twitter:image:alt" content="Touchshell — GNOME made for your fingers. Hero screenshot showing the in-browser GNOME mock and feature toggles." />
@@ -292,6 +292,54 @@
             <div class="hint" id="hint" aria-hidden="true">
               <img id="hintIcon" alt="" />
               <span id="hintLabel"></span>
+            </div>
+
+            <!-- Touch text-action FAB (visible only when fab toggle is on) -->
+            <button class="ts-fab" id="tsFab" type="button" tabindex="-1" aria-label="Text actions" aria-hidden="true">
+              <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true" fill="currentColor">
+                <path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h9A1.5 1.5 0 0 1 14 4.5v7A1.5 1.5 0 0 1 12.5 13h-9A1.5 1.5 0 0 1 2 11.5v-7zm1 0v7c0 .28.22.5.5.5h9a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-9a.5.5 0 0 0-.5.5z"/>
+                <path d="M4 5.75h1.5v1H4v-1zm2.5 0H8v1H6.5v-1zm2.5 0h1.5v1H9v-1zm2.5 0H13v1h-1.5v-1zM4 7.75h1.5v1H4v-1zm2.5 0H8v1H6.5v-1zm2.5 0h1.5v1H9v-1zm2.5 0H13v1h-1.5v-1zM5 9.75h6v1H5v-1z"/>
+              </svg>
+            </button>
+
+            <!-- Action bar that pops above the FAB when tapped -->
+            <div class="ts-fab-bar" id="tsFabBar" role="menu" aria-hidden="true">
+              <button class="ts-fab-btn" type="button" tabindex="-1" data-action="cut" role="menuitem">
+                <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="currentColor"><path d="M3.5 1.5a2 2 0 1 0 1.46 3.36L6.78 6.5l-1.82 1.64A2 2 0 1 0 5.7 9l1.85-1.64L11.5 11a1.5 1.5 0 0 0 1.06.44h.94l-4.94-4.44 4.94-4.44h-.94A1.5 1.5 0 0 0 11.5 3L7.55 6.5 4.96 4.14A2 2 0 0 0 3.5 1.5zm0 1a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm0 7.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>
+                <span>Cut</span>
+              </button>
+              <button class="ts-fab-btn" type="button" tabindex="-1" data-action="copy" role="menuitem">
+                <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="currentColor"><path d="M5 2a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2v-1h2a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1v1H5V2z"/><path d="M2 5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5zm2-1a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H4z"/></svg>
+                <span>Copy</span>
+              </button>
+              <button class="ts-fab-btn" type="button" tabindex="-1" data-action="paste" role="menuitem">
+                <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="currentColor"><path d="M5 0a1.5 1.5 0 0 0-1.5 1.5V2H2a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2h-1.5v-.5A1.5 1.5 0 0 0 9 0H5zm0 1h4a.5.5 0 0 1 .5.5V2H4.5v-.5A.5.5 0 0 1 5 1zM2 3h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/></svg>
+                <span>Paste</span>
+              </button>
+              <button class="ts-fab-btn" type="button" tabindex="-1" data-action="selectAll" role="menuitem">
+                <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="currentColor"><path d="M1 1h2v1H2v1H1V1zm12 0h2v2h-1V2h-1V1zM1 13h1v1h1v1H1v-2zm13 0h1v2h-2v-1h1v-1zM4 1h2v1H4V1zm4 0h2v1H8V1zM4 14h2v1H4v-1zm4 0h2v1H8v-1zM1 4h1v2H1V4zm0 4h1v2H1V8zm13-4h1v2h-1V4zm0 4h1v2h-1V8zM5 5h6v6H5V5zm1 1v4h4V6H6z"/></svg>
+                <span>Select All</span>
+              </button>
+              <button class="ts-fab-btn" type="button" tabindex="-1" data-action="keyboard" role="menuitem">
+                <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="currentColor"><path d="M2 4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H2zm0 1h12a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/><path d="M2.5 6.5h1v1h-1v-1zm2 0h1v1h-1v-1zm2 0h1v1h-1v-1zm2 0h1v1h-1v-1zm2 0h1v1h-1v-1zm2 0h1v1h-1v-1zm-10 2h1v1h-1v-1zm2 0h1v1h-1v-1zm2 0h1v1h-1v-1zm2 0h1v1h-1v-1zm2 0h1v1h-1v-1zm2 0h1v1h-1v-1zm-9 2h7v1h-7v-1z"/></svg>
+                <span>Keyboard</span>
+              </button>
+            </div>
+
+            <!-- On-screen keyboard mock (only the hide button is functional) -->
+            <div class="ts-osk" id="tsOsk" aria-hidden="true">
+              <div class="ts-osk-bar">
+                <button class="ts-osk-hide" type="button" tabindex="-1" aria-label="Hide keyboard">
+                  <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="currentColor">
+                    <path d="M2 4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H2zm0 1h12a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/>
+                    <path d="M8 16l-2-2h4l-2 2z"/>
+                  </svg>
+                </button>
+              </div>
+              <div class="ts-osk-row"><span>q</span><span>w</span><span>e</span><span>r</span><span>t</span><span>y</span><span>u</span><span>i</span><span>o</span><span>p</span></div>
+              <div class="ts-osk-row ts-osk-indent"><span>a</span><span>s</span><span>d</span><span>f</span><span>g</span><span>h</span><span>j</span><span>k</span><span>l</span></div>
+              <div class="ts-osk-row"><span class="ts-osk-wide">⇧</span><span>z</span><span>x</span><span>c</span><span>v</span><span>b</span><span>n</span><span>m</span><span class="ts-osk-wide">⌫</span></div>
+              <div class="ts-osk-row ts-osk-bottom"><span class="ts-osk-meta">?123</span><span class="ts-osk-meta">,</span><span class="ts-osk-space"></span><span class="ts-osk-meta">.</span><span class="ts-osk-meta">⏎</span></div>
             </div>
           </div>
         </div>

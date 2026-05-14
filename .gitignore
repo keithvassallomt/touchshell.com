@@ -1,0 +1,44 @@
+# OS junk
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*~
+.project
+.settings/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Node (in case tooling is ever added)
+node_modules/
+.npm/
+.yarn/
+
+# AWS / build artefacts
+.aws-sam/
+dist/
+build/
+.cache/
+
+# Local server scratch
+.serve/

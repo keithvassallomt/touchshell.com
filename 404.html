@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Lost in the gestures — Touchshell</title>
+  <meta name="description" content="That page doesn't exist." />
+  <meta name="robots" content="noindex" />
+  <link rel="icon" href="/assets/touchshell.svg" type="image/svg+xml" />
+  <style>
+    :root {
+      --bg: #0e0f12;
+      --fg: #e8ecf2;
+      --fg-dim: #aab0bc;
+      --accent: #4c93f4;
+      --line: rgba(255,255,255,.08);
+      --font-ui: "Inter", "Cantarell", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; height: 100%; }
+    body {
+      font-family: var(--font-ui);
+      color: var(--fg);
+      background: radial-gradient(1200px 600px at 50% -10%, #1a2742 0%, var(--bg) 55%) no-repeat, var(--bg);
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+      padding: 2rem;
+      -webkit-font-smoothing: antialiased;
+    }
+    main {
+      text-align: center;
+      max-width: 32rem;
+    }
+    .mark {
+      width: 88px; height: 88px;
+      margin: 0 auto 1.5rem;
+      background: url(/assets/touchshell.svg) center/contain no-repeat;
+      filter: drop-shadow(0 4px 16px rgba(76,147,244,.4));
+    }
+    .code {
+      font-size: 5rem;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      line-height: 1;
+      margin: 0 0 .5rem;
+      background: linear-gradient(180deg, var(--fg) 0%, var(--fg-dim) 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    h1 {
+      font-size: 1.4rem;
+      margin: 0 0 .75rem;
+      letter-spacing: -0.01em;
+    }
+    p {
+      color: var(--fg-dim);
+      line-height: 1.55;
+      margin: 0 0 2rem;
+    }
+    .home {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      padding: .7rem 1.2rem;
+      border-radius: 999px;
+      background: var(--accent);
+      color: white;
+      text-decoration: none;
+      font-weight: 500;
+      transition: transform .15s, box-shadow .15s;
+    }
+    .home:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 24px -8px rgba(76,147,244,.6);
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="mark" aria-hidden="true"></div>
+    <p class="code">404</p>
+    <h1>That gesture didn't land.</h1>
+    <p>The page you're looking for has been swiped away — or it was never here to begin with.</p>
+    <a class="home" href="/">&larr; Back to Touchshell</a>
+  </main>
+</body>
+</html>

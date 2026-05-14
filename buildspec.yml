@@ -1,0 +1,50 @@
+version: 0.2
+
+# Static site deploy: sync to S3, then invalidate CloudFront.
+# Required IAM permissions on the CodeBuild service role:
+#   s3:ListBucket, s3:GetObject, s3:PutObject, s3:DeleteObject  (arn:aws:s3:::touchshell.com and /*)
+#   cloudfront:CreateInvalidation                               (distribution ENFDQ02TKVMJM)
+
+env:
+  variables:
+    BUCKET: touchshell.com
+    DISTRIBUTION_ID: ENFDQ02TKVMJM
+
+phases:
+  pre_build:
+    commands:
+      - aws --version
+
+  build:
+    commands:
+      - echo "Syncing static assets (CSS/JS/SVG/images) with long cache..."
+      - |
+        aws s3 sync . "s3://${BUCKET}/" \
+          --exclude ".git/*" \
+          --exclude ".gitignore" \
+          --exclude "README.md" \
+          --exclude "LICENSE" \
+          --exclude "buildspec.yml" \
+          --exclude "*.html" \
+          --cache-control "public, max-age=3600"
+      - echo "Syncing HTML with short cache and pruning stale files..."
+      - |
+        aws s3 sync . "s3://${BUCKET}/" \
+          --exclude ".git/*" \
+          --exclude ".gitignore" \
+          --exclude "README.md" \
+          --exclude "LICENSE" \
+          --exclude "buildspec.yml" \
+          --cache-control "public, max-age=60, must-revalidate" \
+          --delete
+
+  post_build:
+    commands:
+      - echo "Creating CloudFront invalidation for /*..."
+      - |
+        INVALIDATION_ID=$(aws cloudfront create-invalidation \
+          --distribution-id "${DISTRIBUTION_ID}" \
+          --paths "/*" \
+          --query 'Invalidation.Id' \
+          --output text)
+      - echo "Invalidation created: ${INVALIDATION_ID}"

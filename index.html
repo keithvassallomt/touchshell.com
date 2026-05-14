@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Touchshell — GNOME, made for your fingers</title>
+  <meta name="description" content="A GNOME Shell extension that retrofits iPadOS-style gestures, auto-hiding chrome, and a touch text-action bar onto your Linux desktop." />
+  <link rel="icon" href="assets/touchshell.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-name">Touchshell</span>
+    </a>
+    <nav class="site-nav">
+      <a href="#features">Features</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/keithvassallomt/touchshell" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <h1>GNOME, made for your fingers.</h1>
+        <p class="lede">Touchshell makes GNOME a joy to use on tablets and touchscreens, by adding gestures, fullscreen mode, typing tweaks and more.</p>
+        <div class="hero-cta">
+          <a class="ego-badge" href="https://extensions.gnome.org/extension/9164/" target="_blank" rel="noopener" aria-label="Get it on GNOME Extensions">
+            <img src="assets/get-it-on-ego.svg" alt="Get it on GNOME Extensions" />
+          </a>
+          <a class="github-badge" href="https://github.com/keithvassallomt/touchshell" target="_blank" rel="noopener" aria-label="Source on GitHub">
+            <svg viewBox="0 0 16 16" width="22" height="22" aria-hidden="true" fill="currentColor">
+              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+            </svg>
+            <span>Source</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="stage" id="stage" aria-label="Interactive Touchshell demo">
+        <div class="device" id="device">
+          <button class="device-fullscreen-btn" id="deviceFullscreenBtn" type="button" aria-label="Toggle fullscreen demo">
+            <svg class="icon-expand" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="currentColor">
+              <path d="M2 2h5v1.5H3.5V7H2V2zm12 0v5h-1.5V3.5H9V2h5zM2 14v-5h1.5v3.5H7V14H2zm12 0h-5v-1.5h3.5V9H14v5z"/>
+            </svg>
+            <svg class="icon-collapse" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="currentColor">
+              <path d="M2 6h4V2H4.5v2.5H2V6zm8-4v4h4V4.5h-2.5V2H10zM6 14v-4H2v1.5h2.5V14H6zm8-4h-4v4h1.5v-2.5H14V10z"/>
+            </svg>
+          </button>
+          <div class="shell" id="shell">
+            <!-- top panel -->
+            <div class="panel" id="panel">
+              <button class="panel-workspaces" type="button" id="panelWorkspaces" aria-label="Workspaces">
+                <span class="ws-pip" data-ws="0"></span>
+                <span class="ws-pip" data-ws="1"></span>
+              </button>
+              <button class="panel-clock" type="button" id="panelClock">10:42 · Wed 13 May</button>
+              <div class="panel-tray">
+                <span class="tray-icon" data-icon="wifi" aria-hidden="true"></span>
+                <span class="tray-icon" data-icon="vol" aria-hidden="true"></span>
+                <span class="tray-icon" data-icon="bat" aria-hidden="true"></span>
+              </div>
+            </div>
+
+            <!-- desktop / windows layer -->
+            <div class="stage-layer" id="stageLayer">
+              <div class="workspaces" id="workspaces">
+                <div class="workspace" data-ws="0">
+                  <div class="wallpaper"></div>
+                  <div class="window" style="--x:14%; --y:18%; --w:46%; --h:55%;">
+                    <div class="window-header">
+                      <span class="window-title">Files</span>
+                      <span class="window-close" aria-hidden="true">×</span>
+                    </div>
+                    <div class="window-body files-body">
+                      <div class="sidebar">
+                        <div class="side-item">Home</div>
+                        <div class="side-item">Documents</div>
+                        <div class="side-item">Downloads</div>
+                        <div class="side-item">Pictures</div>
+                      </div>
+                      <div class="files-grid">
+                        <div class="file"></div><div class="file"></div><div class="file"></div>
+                        <div class="file"></div><div class="file"></div><div class="file"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="window" style="--x:48%; --y:36%; --w:44%; --h:50%;">
+                    <div class="window-header dark">
+                      <span class="window-title">Terminal</span>
+                      <span class="window-close" aria-hidden="true">×</span>
+                    </div>
+                    <div class="window-body term-body">
+                      <p><span class="term-prompt">user@touchshell</span> ~/touchshell $ ls</p>
+                      <p>extension.js  lib  prefs.js  README.md</p>
+                      <p><span class="term-prompt">user@touchshell</span> ~/touchshell $ <span class="term-cursor"></span></p>
+                    </div>
+                  </div>
+                  <div class="window textedit-window" data-closable id="closableWindow" style="--x:6%; --y:76%; --w:40%; --h:22%;">
+                    <div class="window-header">
+                      <span class="window-title">TextEdit</span>
+                      <span class="window-close" aria-hidden="true">×</span>
+                    </div>
+                    <div class="window-body textedit-body">
+                      <p class="textedit-prompt">flick up to close me</p>
+                    </div>
+                  </div>
+                </div>
+                <div class="workspace" data-ws="1">
+                  <div class="wallpaper"></div>
+                  <div class="window" style="--x:18%; --y:14%; --w:60%; --h:70%;">
+                    <div class="window-header">
+                      <span class="window-title">Web</span>
+                      <span class="window-close" aria-hidden="true">×</span>
+                    </div>
+                    <div class="window-body web-body">
+                      <div class="web-bar"></div>
+                      <div class="web-content">
+                        <div class="web-line w70"></div>
+                        <div class="web-line w50"></div>
+                        <div class="web-line w90"></div>
+                        <div class="web-line w40"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- overview overlays -->
+              <div class="overview-workspaces" id="overviewWorkspaces" aria-hidden="true">
+                <div class="thumb active" data-ws="0">
+                  <div class="thumb-win" style="--x:14%; --y:18%; --w:46%; --h:55%; --c:#3a3d44"></div>
+                  <div class="thumb-win" style="--x:48%; --y:36%; --w:44%; --h:50%; --c:#1f2024"></div>
+                </div>
+                <div class="thumb" data-ws="1">
+                  <div class="thumb-win" style="--x:18%; --y:14%; --w:60%; --h:70%; --c:#3a3d44"></div>
+                </div>
+              </div>
+
+              <div class="dash" id="dash" aria-hidden="true">
+                <div class="dash-app"></div>
+                <div class="dash-app"></div>
+                <div class="dash-app"></div>
+                <div class="dash-app"></div>
+                <div class="dash-app"></div>
+                <div class="dash-app dash-sep"></div>
+                <div class="dash-app dash-grid"></div>
+              </div>
+
+              <!-- app grid (visible only in mode=app-grid) -->
+              <div class="app-grid" id="appGrid" aria-hidden="true">
+                <div class="app-grid-tile"></div><div class="app-grid-tile"></div>
+                <div class="app-grid-tile"></div><div class="app-grid-tile"></div>
+                <div class="app-grid-tile"></div><div class="app-grid-tile"></div>
+                <div class="app-grid-tile"></div><div class="app-grid-tile"></div>
+                <div class="app-grid-tile"></div><div class="app-grid-tile"></div>
+                <div class="app-grid-tile"></div><div class="app-grid-tile"></div>
+              </div>
+            </div>
+
+            <!-- desktop notification banner (dismissible) -->
+            <div class="banner" id="banner" data-dismiss="banner">
+              <span class="banner-head">
+                <img class="notif-icon" src="assets/touchshell.svg" data-icon="touchshell" alt="" aria-hidden="true" />
+                <span class="banner-app">Touchshell</span>
+              </span>
+              <span class="banner-title">Dismiss me</span>
+              <span class="banner-body">Swipe up to dismiss me</span>
+            </div>
+
+            <!-- quick settings popover -->
+            <div class="popover popover-qs" id="popoverQs" aria-hidden="true">
+              <!-- Sliders at the top -->
+              <div class="qs-slider">
+                <span class="qs-slider-icon" data-icon="vol" aria-hidden="true"></span>
+                <div class="qs-slider-track"><div class="qs-slider-fill" style="width:42%"></div></div>
+              </div>
+              <div class="qs-slider">
+                <span class="qs-slider-icon" data-icon="brightness" aria-hidden="true"></span>
+                <div class="qs-slider-track"><div class="qs-slider-fill" style="width:68%"></div></div>
+              </div>
+
+              <!-- Tiles -->
+              <div class="qs-tiles">
+                <button class="qs-tile on" type="button" data-tile="wifi">
+                  <span class="qs-tile-icon" data-icon="wifi" aria-hidden="true"></span>
+                  <span class="qs-tile-label">Wi-Fi</span>
+                  <span class="qs-tile-chev" aria-hidden="true">›</span>
+                </button>
+                <button class="qs-tile on" type="button" data-tile="bluetooth">
+                  <span class="qs-tile-icon" data-icon="bluetooth" aria-hidden="true"></span>
+                  <span class="qs-tile-label">Bluetooth</span>
+                  <span class="qs-tile-chev" aria-hidden="true">›</span>
+                </button>
+                <button class="qs-tile" type="button" data-tile="night-light">
+                  <span class="qs-tile-icon" data-icon="night-light" aria-hidden="true"></span>
+                  <span class="qs-tile-label">Night Light</span>
+                </button>
+                <button class="qs-tile on" type="button" data-tile="dark-style">
+                  <span class="qs-tile-icon qs-tile-icon-inline" aria-hidden="true">
+                    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.5a6.5 6.5 0 1 0 0 13zm0 1.4v10.2a5.1 5.1 0 0 1 0-10.2z"/><path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zm0 1.5a6.5 6.5 0 0 1 0 13 6.5 6.5 0 0 1 0-13z" opacity=".7"/></svg>
+                  </span>
+                  <span class="qs-tile-label">Dark Style</span>
+                </button>
+                <button class="qs-tile qs-tile-touchshell" type="button" data-tile="touchshell" id="qsTouchshell" aria-expanded="false">
+                  <span class="qs-tile-icon qs-tile-icon-brand" aria-hidden="true"></span>
+                  <span class="qs-tile-label">Touchshell</span>
+                  <span class="qs-tile-chev" aria-hidden="true">›</span>
+                </button>
+              </div>
+
+              <!-- Touchshell sub-panel (shown when qsTouchshell is expanded) -->
+              <div class="qs-subpanel" id="qsTouchshellPanel">
+                <div class="qs-subpanel-header">
+                  <span class="qs-tile-icon qs-tile-icon-brand" aria-hidden="true"></span>
+                  <span class="qs-subpanel-title">Touchshell</span>
+                </div>
+                <div class="qs-sub-row">
+                  <span class="qs-sub-label">Fullscreen apps</span>
+                  <button class="qs-sub-toggle" type="button" role="switch" data-qs-toggle="fullscreen-apps" aria-checked="false">
+                    <span class="qs-sub-pip"></span>
+                  </button>
+                </div>
+                <div class="qs-sub-row">
+                  <span class="qs-sub-label">Auto-hide top panel</span>
+                  <button class="qs-sub-toggle" type="button" role="switch" data-qs-toggle="panel-hide" aria-checked="false">
+                    <span class="qs-sub-pip"></span>
+                  </button>
+                </div>
+                <div class="qs-sub-row">
+                  <span class="qs-sub-label">Touch text-action FAB</span>
+                  <button class="qs-sub-toggle" type="button" role="switch" data-qs-toggle="fab" aria-checked="false">
+                    <span class="qs-sub-pip"></span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- calendar / notifications popover -->
+            <div class="popover popover-cal" id="popoverCal" aria-hidden="true">
+              <div class="cal-header" id="calHeader"></div>
+              <div class="cal-grid" id="calGrid"></div>
+              <div class="notif-list">
+                <div class="notif dismissible" id="bannerShadeEntry" data-dismiss="notif">
+                  <span class="notif-head">
+                    <img class="notif-icon" src="assets/touchshell.svg" data-icon="touchshell" alt="" aria-hidden="true" />
+                    <span class="notif-app">Touchshell</span>
+                  </span>
+                  <span class="notif-body">Swipe left to dismiss me</span>
+                </div>
+                <div class="notif">
+                  <span class="notif-head">
+                    <img class="notif-icon" src="assets/touchshell.svg" data-icon="touchshell" alt="" aria-hidden="true" />
+                    <span class="notif-app">Touchshell</span>
+                  </span>
+                  <span class="notif-body">v1.0 is ready</span>
+                </div>
+                <div class="notif">
+                  <span class="notif-head">
+                    <span class="notif-icon" data-icon="files" aria-hidden="true"></span>
+                    <span class="notif-app">Files</span>
+                  </span>
+                  <span class="notif-body">Sync complete</span>
+                </div>
+              </div>
+            </div>
+            <!-- bottom action bar (visible when toggled on; visual only) -->
+            <div class="action-bar" id="actionBar" aria-hidden="true"></div>
+
+            <!-- gesture hint overlay (lives inside the shell so anchor coords match) -->
+            <div class="hint" id="hint" aria-hidden="true">
+              <img id="hintIcon" alt="" />
+              <span id="hintLabel"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- simulation control bar (below the device, scales with .stage) -->
+        <div class="sim-controls" id="simControls">
+          <button class="sim-toggle" type="button" data-toggle="fullscreen-apps" aria-checked="false">
+            <span class="sim-toggle-track"><span class="sim-toggle-pip"></span></span>
+            <span class="sim-toggle-label">Fullscreen apps</span>
+          </button>
+          <button class="sim-toggle" type="button" data-toggle="panel-hide" aria-checked="false">
+            <span class="sim-toggle-track"><span class="sim-toggle-pip"></span></span>
+            <span class="sim-toggle-label">Auto-hide panel</span>
+          </button>
+          <button class="sim-toggle" type="button" data-toggle="action-bar" aria-checked="false">
+            <span class="sim-toggle-track"><span class="sim-toggle-pip"></span></span>
+            <span class="sim-toggle-label">Action bar</span>
+          </button>
+          <button class="sim-toggle" type="button" data-toggle="fab" aria-checked="false">
+            <span class="sim-toggle-track"><span class="sim-toggle-pip"></span></span>
+            <span class="sim-toggle-label">Text-action FAB</span>
+          </button>
+        </div>
+
+        <!-- mobile fallback (shown via CSS on small screens) -->
+        <div class="mobile-fallback" aria-hidden="true">
+          <video autoplay muted loop playsinline preload="metadata" poster="">
+            <source src="https://github.com/keithvassallomt/touchshell/releases/download/demos-v1/bottom-edge.webm" type="video/webm" />
+          </video>
+          <p class="mobile-fallback-caption">Best viewed on a touchscreen tablet or desktop. Touchshell makes GNOME swipe-friendly.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="features" class="features">
+      <h2>Gestures &amp; Tweaks</h2>
+      <p class="section-lede">Each feature has an Off / Auto / Always switch. Auto enables a feature when your convertible is in tablet mode.</p>
+
+      <!-- feature sections will be hydrated by app.js from a manifest, kept inline here for no-JS users -->
+      <div class="feature-grid" id="featureGrid"></div>
+    </section>
+
+    <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-labelledby="lightboxTitle" hidden>
+      <button class="lightbox-close" id="lightboxClose" type="button" aria-label="Close">&times;</button>
+      <button class="lightbox-nav lightbox-prev" id="lightboxPrev" type="button" aria-label="Previous">&larr;</button>
+      <button class="lightbox-nav lightbox-next" id="lightboxNext" type="button" aria-label="Next">&rarr;</button>
+      <div class="lightbox-stage">
+        <video id="lightboxVideo" autoplay muted loop playsinline preload="auto"></video>
+        <figcaption class="lightbox-caption">
+          <h3 id="lightboxTitle"></h3>
+          <p id="lightboxDesc"></p>
+        </figcaption>
+      </div>
+    </div>
+
+    <section id="install" class="install">
+      <h2>Install</h2>
+      <div class="install-cards">
+        <a class="install-card install-ego" href="https://extensions.gnome.org/extension/9164/" target="_blank" rel="noopener">
+          <h3>From extensions.gnome.org</h3>
+          <p>One-click install. Recommended for most users on GNOME 49 or 50.</p>
+          <img class="install-ego-badge" src="assets/get-it-on-ego.svg" alt="Get it on GNOME Extensions" />
+        </a>
+        <div class="install-card">
+          <h3>From source</h3>
+          <div class="code-block">
+            <button class="code-copy" type="button" data-copy-target="installCode" aria-label="Copy to clipboard">
+              <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="currentColor">
+                <path d="M5 2a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2v-1h2a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1v1H5V2z"/>
+                <path d="M2 5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5zm2-1a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H4z"/>
+              </svg>
+              <span class="code-copy-label">Copy</span>
+            </button>
+            <pre><code id="installCode" class="lang-shell"><span class="tok-cmd">git</span> <span class="tok-sub">clone</span> <span class="tok-url">https://github.com/keithvassallomt/touchshell.git</span>
+<span class="tok-cmd">cd</span> <span class="tok-path">touchshell</span>
+<span class="tok-cmd">./scripts/pack.sh</span>
+<span class="tok-cmd">gnome-extensions</span> <span class="tok-sub">install</span> <span class="tok-flag">--force</span> <span class="tok-cont">\</span>
+  <span class="tok-path">dist/touchshell@touchshell.com.shell-extension.zip</span></code></pre>
+          </div>
+          <p class="install-note">Wayland session only. Log out and log back in after installing.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <a class="manifesto-badge" href="https://friendlymanifesto.org" target="_blank" rel="noopener" aria-label="Friendly Manifesto adherent">
+      <img src="assets/friendly-manifesto-badge-white.svg" alt="Friendly Manifesto" />
+    </a>
+    <p class="copyright">GPL-2.0 &middot; &copy; <span id="copyrightYear"></span> Keith Vassallo</p>
+  </footer>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

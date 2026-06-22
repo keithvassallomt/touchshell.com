@@ -443,6 +443,163 @@ shell.addEventListener('pointermove', onPointerMove);
 shell.addEventListener('pointerup', onPointerUp);
 shell.addEventListener('pointercancel', onPointerUp);
 
+// ---------- Flick to tile (titlebar drag) ----------
+// Touch-drag a desktop window by its titlebar; a fast flick at release snaps
+// it — left/right tile to that half, up maximizes, down minimizes — while a
+// slow drag springs back. Mirrors the extension's WindowTilingFlickGesture
+// (velocity on the dominant axis, distance fallback). Only active on the
+// desktop (idle, workspace 0); in any other mode the pointerdown is left to
+// bubble to the shell gesture system above. After a snap the window
+// auto-restores so the looping demo can repeat.
+const TILE_FLICK_V = 0.8;       // px/ms on the dominant axis to count as a flick
+const TILE_FLICK_WINDOW = 120;  // ms window the release velocity is measured over
+const TILE_FLICK_MIN_DIST = 24; // px of travel required before a flick can register
+const TILE_PANEL_H = 28;        // matches .panel height / .window-maximized top
+const TILE_TRANSITION =
+  'transform .3s cubic-bezier(.2,.7,.2,1), left .3s cubic-bezier(.2,.7,.2,1),' +
+  ' top .3s cubic-bezier(.2,.7,.2,1), width .3s cubic-bezier(.2,.7,.2,1),' +
+  ' height .3s cubic-bezier(.2,.7,.2,1), opacity .3s ease';
+let tileDrag = null;
+let tileRestoreTimer = null;
+
+function tileTargets() {
+  return Array.from(document.querySelectorAll('.workspace[data-ws="0"] .window:not([data-closable])'));
+}
+
+// Revert to the window's original (CSS-var %) geometry, optionally animated.
+function restoreTiledWindow(el) {
+  el.style.transition = TILE_TRANSITION;
+  el.style.transform = '';
+  el.style.opacity = '';
+  el.style.removeProperty('left');
+  el.style.removeProperty('top');
+  el.style.removeProperty('width');
+  el.style.removeProperty('height');
+}
+
+function snapWindow(el, kind) {
+  const r = shell.getBoundingClientRect();
+  const w = r.width, h = r.height;
+  el.style.transition = TILE_TRANSITION;
+  el.style.transform = '';
+  el.style.zIndex = '4';
+  if (kind === 'minimize') {
+    el.style.transform = `translateY(${h}px) scale(.6)`;
+    el.style.opacity = '0';
+  } else {
+    let left = 0, width = w;
+    if (kind === 'left')  { width = Math.round(w / 2); }
+    if (kind === 'right') { left = Math.round(w / 2); width = w - left; }
+    // 'maximize' keeps the full-width defaults
+    el.style.left = `${left}px`;
+    el.style.top = `${TILE_PANEL_H}px`;
+    el.style.width = `${width}px`;
+    el.style.height = `${h - TILE_PANEL_H}px`;
+  }
+  if (tileRestoreTimer) clearTimeout(tileRestoreTimer);
+  tileRestoreTimer = setTimeout(() => { restoreTiledWindow(el); }, 2600);
+}
+
+function onTileDown(e) {
+  // Only the desktop view drives flick-to-tile; otherwise let it bubble.
+  if (state.mode !== 'idle' || currentWs !== 0 || tileDrag) return;
+  const el = e.currentTarget.closest('.window');
+  if (!el) return;
+  e.stopPropagation();
+  e.preventDefault();
+  if (tileRestoreTimer) { clearTimeout(tileRestoreTimer); tileRestoreTimer = null; }
+  e.currentTarget.setPointerCapture(e.pointerId);
+  tileDrag = {
+    el,
+    header: e.currentTarget,
+    pointerId: e.pointerId,
+    startX: e.clientX, startY: e.clientY,
+    dx: 0, dy: 0,
+    samples: [{ t: e.timeStamp || performance.now(), x: e.clientX, y: e.clientY }],
+  };
+  // Grabbing a tiled/snapped window restores it to its original floating size
+  // first (mirrors GNOME), so the drag starts clean and a non-flick release
+  // doesn't leave it stuck tiled. Done without a transition so the subsequent
+  // translate tracks from the restored box.
+  el.style.transition = 'none';
+  el.style.transform = '';
+  el.style.opacity = '';
+  el.style.removeProperty('left');
+  el.style.removeProperty('top');
+  el.style.removeProperty('width');
+  el.style.removeProperty('height');
+  void el.offsetWidth; // reflow so the restore lands before tracking begins
+  el.style.zIndex = '4';
+  stopCycle();
+}
+
+function onTileMove(e) {
+  const g = tileDrag;
+  if (!g || e.pointerId !== g.pointerId) return;
+  g.dx = e.clientX - g.startX;
+  g.dy = e.clientY - g.startY;
+  g.samples.push({ t: e.timeStamp || performance.now(), x: e.clientX, y: e.clientY });
+  if (g.samples.length > 12) g.samples.shift();
+  g.el.style.transform = `translate(${g.dx}px, ${g.dy}px)`;
+}
+
+function onTileUp(e) {
+  const g = tileDrag;
+  if (!g || e.pointerId !== g.pointerId) return;
+  tileDrag = null;
+  try { g.header.releasePointerCapture(g.pointerId); } catch {}
+
+  // Record the release point so a move-then-pause-then-lift reads as a slow
+  // drag (velocity ~0 over the final window) rather than a stale fast flick.
+  const tUp = e.timeStamp || performance.now();
+  g.samples.push({ t: tUp, x: e.clientX, y: e.clientY });
+
+  // Release velocity over the final TILE_FLICK_WINDOW ms (px/ms): first is the
+  // oldest sample still inside that window.
+  const s = g.samples;
+  const last = s[s.length - 1];
+  let first = last;
+  for (let i = s.length - 2; i >= 0; i--) {
+    if (last.t - s[i].t <= TILE_FLICK_WINDOW) first = s[i];
+    else break;
+  }
+  const dt = Math.max(1, last.t - first.t);
+  const vx = (last.x - first.x) / dt;
+  const vy = (last.y - first.y) / dt;
+  const absVX = Math.abs(vx), absVY = Math.abs(vy);
+
+  // Flick = fast on release AND some real travel. A slow drag-and-drop — at any
+  // distance — leaves the window where it lands (matches the extension; there
+  // is deliberately no distance-only trigger).
+  const moved = Math.hypot(g.dx, g.dy) >= TILE_FLICK_MIN_DIST;
+  let kind = null;
+  if (moved && (absVX >= TILE_FLICK_V || absVY >= TILE_FLICK_V)) {
+    kind = absVX >= absVY ? (vx < 0 ? 'left' : 'right') : (vy < 0 ? 'maximize' : 'minimize');
+  }
+
+  if (kind) {
+    snapWindow(g.el, kind);
+    pauseCycle(6000);
+  } else {
+    // Slow drag — spring back to where it started.
+    g.el.style.transition = 'transform .25s cubic-bezier(.2,.7,.2,1)';
+    g.el.style.transform = '';
+    pauseCycle(5000);
+  }
+}
+
+tileTargets().forEach((win) => {
+  const header = win.querySelector('.window-header');
+  if (!header) return;
+  header.style.touchAction = 'none';
+  header.style.userSelect = 'none';
+  header.style.cursor = 'grab';
+  header.addEventListener('pointerdown', onTileDown);
+  header.addEventListener('pointermove', onTileMove);
+  header.addEventListener('pointerup', onTileUp);
+  header.addEventListener('pointercancel', onTileUp);
+});
+
 // ---------- hint overlay (state-aware) ----------
 // HINT_SETS is keyed by state.mode. When mode changes, the active set switches
 // and the cycle restarts from index 0. `at` is either {x,y} fractions of the shell
@@ -458,6 +615,9 @@ const HINT_SETS = {
     { icon: 'assets/swipe_left.svg', label: 'Switch workspace', at: { x: 0.20, y: 0.88 } },
     // Desktop swipe-up anchors in the bottom-right (right of Files, below Terminal)
     { icon: 'assets/swipe_up.svg',    label: 'Overview',         at: { x: 0.78, y: 0.90 }, flip: true },
+    // Flick a window by its titlebar to tile/maximize/minimize. One hint only —
+    // four directional hints would be overkill — anchored on a window's titlebar.
+    { icon: 'assets/swipe_right.svg', label: 'Flick to tile',    at: 'tile-window-header' },
   ],
   overview: [
     { icon: 'assets/swipe_right.svg', label: 'Switch workspace', at: { x: 0.50, y: 0.55 } },
@@ -485,6 +645,17 @@ function resolveAnchor(anchorSpec, rect) {
     return {
       x: (nr.left + nr.width * 0.72 - rect.left) / rect.width,
       y: ((nr.top + nr.bottom) / 2 + 14 - rect.top) / rect.height,
+    };
+  }
+  if (anchorSpec === 'tile-window-header') {
+    // Point at the first desktop window's titlebar — the flick-to-tile target.
+    const el = document.querySelector('.workspace[data-ws="0"] .window:not([data-closable]) .window-header');
+    if (!el) return null;
+    const nr = el.getBoundingClientRect();
+    if (nr.width === 0 || nr.height === 0) return null;
+    return {
+      x: ((nr.left + nr.right) / 2 - rect.left) / rect.width,
+      y: ((nr.top  + nr.bottom) / 2 - rect.top)  / rect.height,
     };
   }
   if (anchorSpec === 'closable-window') {
@@ -626,6 +797,8 @@ const FEATURES = [
     desc: 'Flick a window thumbnail upward in the overview to close that window.' },
   { group: 'Windows', title: 'Fullscreen Apps mode', file: 'fullscreen-apps.webm', def: 'Auto',
     desc: 'Open new windows maximized by default. Two-finger downward swipe inside a maximized window restores it.' },
+  { group: 'Windows', title: 'Flick to tile', file: 'window-tiling-flick.webm', def: 'Always',
+    desc: 'Touch-drag a window by its titlebar and flick to snap it: left or right tiles it to that half, up maximizes, down minimizes. A fast flick triggers it; a slow drag-and-drop leaves the window where it lands. Mouse drags are unaffected.' },
   { group: 'Windows', title: 'Top panel auto-hide', file: 'panel-auto-hide.webm', def: 'Auto',
     desc: 'Hides the top panel when a window is maximized. Reveals on top-edge proximity or panel menu interaction.' },
   { group: 'Touch helpers', title: 'Swipe to dismiss notifications', file: 'notif-dismiss.webm', def: 'Always',

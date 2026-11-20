@@ -242,6 +242,18 @@ p { line-height: 1.55; color: var(--fg-dim); }
   user-select: none;
 }
 
+/* Touch cursor: a mouse over the demo shows a translucent "finger" circle,
+   like the touch indicator in the demo videos, and turns more solid while
+   pressed. A touchscreen has no hover cursor, so it overrides every
+   per-element cursor inside the demo (buttons, text, titlebars). The dark
+   outer ring keeps it visible on light surfaces. */
+.shell, .shell * {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36'%3E%3Ccircle cx='18' cy='18' r='17.25' fill='none' stroke='black' stroke-opacity='.25' stroke-width='1'/%3E%3Ccircle cx='18' cy='18' r='16' fill='white' fill-opacity='.35' stroke='white' stroke-opacity='.6' stroke-width='1.5'/%3E%3C/svg%3E") 18 18, auto !important;
+}
+.shell:active, .shell:active * {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36'%3E%3Ccircle cx='18' cy='18' r='17.25' fill='none' stroke='black' stroke-opacity='.25' stroke-width='1'/%3E%3Ccircle cx='18' cy='18' r='16' fill='white' fill-opacity='.6' stroke='white' stroke-opacity='.8' stroke-width='1.5'/%3E%3C/svg%3E") 18 18, auto !important;
+}
+
 /* ===== Top panel ===== */
 .panel {
   position: absolute; top: 0; left: 0; right: 0;

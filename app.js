@@ -693,7 +693,6 @@ tileTargets().forEach((win) => {
   if (!header) return;
   header.style.touchAction = 'none';
   header.style.userSelect = 'none';
-  header.style.cursor = 'grab';
   header.addEventListener('pointerdown', onTileDown);
   header.addEventListener('pointermove', onTileMove);
   header.addEventListener('pointerup', onTileUp);

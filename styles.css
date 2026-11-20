@@ -362,6 +362,14 @@ button.panel-clock {
 .window-title { font-size: 11px; font-weight: 600; color: #e0e3eb; }
 .window-close { font-size: 16px; color: #aab; line-height: 1; }
 .window-body { flex: 1; display: flex; min-height: 0; }
+/* Left-edge window switch: a brief pop as a window comes to the front.
+   Animates `scale`, not `transform`, so it composes with flick-to-tile's
+   inline transforms. */
+@keyframes window-raise {
+  from { scale: .96; }
+  to   { scale: 1; }
+}
+.window.raising { animation: window-raise .25s cubic-bezier(.2,.7,.2,1); }
 .files-body { background: #2b2d31; }
 .sidebar { width: 32%; background: #232529; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
 .side-item { font-size: 9px; color: #c8cdd6; padding: 4px 6px; border-radius: 4px; }

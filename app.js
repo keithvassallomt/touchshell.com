@@ -16,6 +16,7 @@ let currentWs = 0;
 
 const EDGE_BOTTOM = 0.94;      // start zone: y > h * EDGE_BOTTOM
 const EDGE_TOP = 0.06;          // start zone: y < h * EDGE_TOP
+const EDGE_LEFT = 0.05;         // start zone: x < w * EDGE_LEFT
 const RIGHT_BAND = 0.66;        // top-right: x > w * RIGHT_BAND
 const CENTER_LEFT = 0.35;
 const CENTER_RIGHT = 0.65;
@@ -35,6 +36,8 @@ function classifyZone(x, y, w, h) {
     return 'TOP_OTHER';
   }
   if (y > h * EDGE_BOTTOM) return 'BOTTOM_EDGE';
+  // Desktop only, like the extension (it stands down while the overview is up).
+  if (x < w * EDGE_LEFT && state.mode === 'idle') return 'LEFT_EDGE';
   return 'BODY';
 }
 
@@ -55,7 +58,10 @@ function classifyGesture(zone, dx, dy, ctx) {
   if (zone === 'BOTTOM_EDGE' && dy < -MOVE_THRESHOLD) return 'OVERVIEW_FROM_BOTTOM';
   if (zone === 'TOP_RIGHT' && dy > MOVE_THRESHOLD) return 'QS';
   if (zone === 'TOP_CENTER' && dy > MOVE_THRESHOLD) return 'CAL';
-  if (zone === 'BODY') {
+  // Horizontal only (the extension pans on X): a vertical swipe from the left
+  // edge falls through to the desktop gestures below.
+  if (zone === 'LEFT_EDGE' && absX > absY && absX > MOVE_THRESHOLD) return 'LEFT_EDGE';
+  if (zone === 'BODY' || zone === 'LEFT_EDGE') {
     if (absY > absX && dy < -MOVE_THRESHOLD) return 'OVERVIEW_FROM_DESKTOP';
     if (absX > absY && absX > MOVE_THRESHOLD) return 'WORKSPACE_SWITCH';
   }
@@ -302,6 +308,10 @@ function onPointerMove(e) {
     case 'APP_GRID_BACK': {
       break;
     }
+    case 'LEFT_EDGE': {
+      trackLeftEdge(g);
+      break;
+    }
   }
 }
 
@@ -384,6 +394,10 @@ function onPointerUp(e) {
         if (g.dy > 60) setMode('overview');
         break;
       }
+      case 'LEFT_EDGE': {
+        endLeftEdge(g, e.type === 'pointercancel');
+        break;
+      }
       case 'BANNER_DISMISS': {
         // velocity-aware commit on upward fling
         const samples = g.samples;
@@ -443,6 +457,89 @@ shell.addEventListener('pointermove', onPointerMove);
 shell.addEventListener('pointerup', onPointerUp);
 shell.addEventListener('pointercancel', onPointerUp);
 
+// ---------- Left edge → switch windows ----------
+// Mirrors the extension's LeftEdgeSwipeGesture: swipe in from the left edge
+// and release to raise the window used before the current one; swipe again
+// within LEFT_EDGE_CYCLE_MS to step through a frozen snapshot of the stack
+// instead of flipping between the top two. Swipe in and hold still for
+// LEFT_EDGE_HOLD_MS to open the overview instead. The mock has no focus
+// model, so stacking order stands in for most-recently-used order.
+const LEFT_EDGE_MIN_DX = 40;      // px of inward travel before a release switches or a hold arms
+const LEFT_EDGE_HOLD_MS = 450;
+const LEFT_EDGE_HOLD_JITTER = 6;  // px of movement that restarts the hold timer
+const LEFT_EDGE_CYCLE_MS = 2000;
+let windowZ = 4;
+let windowCycle = null;           // { ws, list, index, at }
+
+// Bring a window to the top of its workspace's stack. Shared with
+// flick-to-tile so both gestures agree on what's on top.
+function raiseWindow(el, animate = false) {
+  el.style.zIndex = String(++windowZ);
+  if (animate) {
+    el.classList.remove('raising');
+    void el.offsetWidth; // reflow so the animation restarts
+    el.classList.add('raising');
+  }
+}
+
+// Visible windows on a workspace, topmost first.
+function stackedWindows(ws) {
+  return Array.from(document.querySelectorAll(`.workspace[data-ws="${ws}"] .window`))
+    .map((el, i) => ({ el, i, z: Number(el.style.zIndex) || 0 }))
+    .filter(({ el }) => getComputedStyle(el).display !== 'none')
+    .sort((a, b) => (b.z - a.z) || (b.i - a.i))
+    .map(({ el }) => el);
+}
+
+function clearLeftEdgeHold(g) {
+  if (g.holdTimer) { clearTimeout(g.holdTimer); g.holdTimer = null; }
+}
+
+function trackLeftEdge(g) {
+  if (g.held) return;
+  if (g.dx < LEFT_EDGE_MIN_DX || Math.abs(g.dy) > g.dx) {
+    clearLeftEdgeHold(g);
+    g.anchorX = g.dx;
+    g.anchorY = g.dy;
+    return;
+  }
+  // Only real movement restarts the hold: a resting finger still jitters.
+  const moved = Math.hypot(g.dx - (g.anchorX ?? 0), g.dy - (g.anchorY ?? 0));
+  if (!g.holdTimer || moved >= LEFT_EDGE_HOLD_JITTER) {
+    g.anchorX = g.dx;
+    g.anchorY = g.dy;
+    clearLeftEdgeHold(g);
+    g.holdTimer = setTimeout(() => {
+      g.holdTimer = null;
+      g.held = true;
+      windowCycle = null;
+      setMode('overview');
+    }, LEFT_EDGE_HOLD_MS);
+  }
+}
+
+function endLeftEdge(g, cancelled) {
+  clearLeftEdgeHold(g);
+  // A hold already opened the overview; releasing doesn't switch windows.
+  if (g.held || cancelled) return;
+  if (g.dx < LEFT_EDGE_MIN_DX || Math.abs(g.dy) > g.dx) return;
+  switchToNextWindow();
+}
+
+function switchToNextWindow() {
+  const wins = stackedWindows(currentWs);
+  if (wins.length < 2) { windowCycle = null; return; }
+  const now = performance.now();
+  let c = windowCycle;
+  if (!c || c.ws !== currentWs || now - c.at > LEFT_EDGE_CYCLE_MS ||
+      !c.list.every((w) => wins.includes(w))) {
+    c = windowCycle = { ws: currentWs, list: wins, index: 0, at: now };
+  }
+  c.index = (c.index + 1) % c.list.length;
+  c.at = now;
+  raiseWindow(c.list[c.index], true);
+}
+
 // ---------- Flick to tile (titlebar drag) ----------
 // Touch-drag a desktop window by its titlebar; a fast flick at release snaps
 // it — left/right tile to that half, up maximizes, down minimizes — while a
@@ -482,7 +579,7 @@ function snapWindow(el, kind) {
   const w = r.width, h = r.height;
   el.style.transition = TILE_TRANSITION;
   el.style.transform = '';
-  el.style.zIndex = '4';
+  raiseWindow(el);
   if (kind === 'minimize') {
     el.style.transform = `translateY(${h}px) scale(.6)`;
     el.style.opacity = '0';
@@ -529,7 +626,10 @@ function onTileDown(e) {
   el.style.removeProperty('width');
   el.style.removeProperty('height');
   void el.offsetWidth; // reflow so the restore lands before tracking begins
-  el.style.zIndex = '4';
+  raiseWindow(el);
+  // Raising by hand breaks a left-edge cycle in progress, as focusing a
+  // window would in GNOME.
+  windowCycle = null;
   stopCycle();
 }
 
@@ -618,6 +718,8 @@ const HINT_SETS = {
     // Flick a window by its titlebar to tile/maximize/minimize. One hint only —
     // four directional hints would be overkill — anchored on a window's titlebar.
     { icon: 'assets/swipe_right.svg', label: 'Flick to tile',    at: 'tile-window-header' },
+    // Swipe in from the left edge to bring the other window forward.
+    { icon: 'assets/swipe_right.svg', label: 'Switch window',    at: 'left-edge' },
   ],
   overview: [
     { icon: 'assets/swipe_right.svg', label: 'Switch workspace', at: { x: 0.50, y: 0.55 } },
@@ -657,6 +759,10 @@ function resolveAnchor(anchorSpec, rect) {
       x: ((nr.left + nr.right) / 2 - rect.left) / rect.width,
       y: ((nr.top  + nr.bottom) / 2 - rect.top)  / rect.height,
     };
+  }
+  if (anchorSpec === 'left-edge') {
+    // First workspace only: the others have a single window, so nothing to switch to.
+    return currentWs === 0 ? { x: EDGE_LEFT, y: 0.55 } : null;
   }
   if (anchorSpec === 'closable-window') {
     const el = document.querySelector('[data-closable]');
@@ -783,6 +889,8 @@ const FEATURES = [
     desc: 'Swipe down from the top-right to open Quick Settings. Works over fullscreen apps too.' },
   { group: 'Edges', title: 'Top-center → Notifications', file: 'top-center.webm', def: 'Always',
     desc: 'Swipe down from the top-center to open the date menu (notifications and calendar).' },
+  { group: 'Edges', title: 'Left edge → Switch windows', file: 'left-edge.webm', def: 'Auto',
+    desc: 'Swipe in from the left edge to switch to the window you used before this one, and swipe again within two seconds to step through the rest. Swipe in and hold to open the overview.' },
   { group: 'Workspaces', title: 'Desktop horizontal swipe', file: 'desktop-workspace.webm', def: 'Always',
     desc: 'Single-finger horizontal swipe on the desktop background switches workspaces. RTL locales flip automatically.' },
   { group: 'Workspaces', title: 'In-overview horizontal swipe', file: 'overview-workspace.webm', def: 'Always',
